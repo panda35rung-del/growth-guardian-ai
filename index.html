@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GROWTH GUARDIAN AI</title>
+
+  <!-- ฟอนต์ภาษาไทย -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js สำหรับกราฟ -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="app">
+
+    <!-- ฉากหลังเมนูมือถือ -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo">🛡️</div>
+        <div class="brand-text">
+          <b>GROWTH GUARDIAN AI</b>
+          <span>คัดกรองพัฒนาการเด็กปฐมวัย</span>
+        </div>
+      </div>
+
+      <!-- ช่องค้นหานักเรียน -->
+      <div class="search-wrap">
+        <input type="text" id="searchInput" placeholder="ค้นหาชื่อ หรือ ห้องเรียน..." />
+      </div>
+
+      <!-- รายชื่อนักเรียนทั้งหมด -->
+      <div class="student-list" id="studentList">
+        <div class="list-title">รายชื่อนักเรียน</div>
+      </div>
+
+      <!-- ปุ่มจัดการ -->
+      <div class="sidebar-actions">
+        <button class="btn btn-grad" id="btnNewStudent">+ เพิ่มนักเรียนใหม่</button>
+        <button class="btn btn-ghost" id="btnRefresh">🔄 รีเฟรชข้อมูล Cloud</button>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <main class="main">
+
+      <!-- แถบบนสำหรับมือถือ -->
+      <div class="topbar">
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <b>GROWTH GUARDIAN AI</b>
+      </div>
+
+      <!-- หัวเว็บ -->
+      <div class="app-header">
+        <div class="logo">🛡️</div>
+        <div>
+          <h1>GROWTH GUARDIAN AI</h1>
+          <div class="sub-en">AI-Powered Early Childhood Development and Health Screening System</div>
+          <div class="sub-th">ระบบคัดกรองความเสี่ยงพัฒนาการล่าช้าและสุขภาพเด็กปฐมวัยอัจฉริยะ</div>
+        </div>
+      </div>
+
+      <!-- สถานะการเชื่อมต่อ Cloud -->
+      <div class="cloud-status offline" id="cloudStatus">⏳ กำลังตรวจสอบการเชื่อมต่อ...</div>
+
+      <!-- ============================================ -->
+      <!-- STEP 1 : กรอกข้อมูลเด็ก -->
+      <!-- ============================================ -->
+      <section class="screen active" id="screenStep1">
+        <div class="card">
+          <div class="card-head"><span class="ic">🧒</span><h2>ข้อมูลเด็ก</h2></div>
+          <div class="card-sub">กรุณากรอกข้อมูลให้ครบถ้วน</div>
+
+          <div class="form-grid">
+            <!-- คอลัมน์รูปภาพ -->
+            <div class="photo-col">
+              <label style="font-size:13.5px;font-weight:600;">รูปภาพเด็ก</label>
+              <div class="photo-box" id="photoBox">
+                <div class="ph"><span class="big">📷</span>ยังไม่มีรูปภาพ</div>
+              </div>
+              <input type="file" id="photoInput" accept="image/*" hidden />
+              <button class="btn btn-grad" id="btnUploadPhoto">📷 อัปโหลดรูปภาพ</button>
+            </div>
+
+            <!-- คอลัมน์ฟอร์ม -->
+            <div class="form-fields">
+              <div class="field">
+                <label>ชื่อ - นามสกุล</label>
+                <input type="text" id="fullName" placeholder="เช่น เด็กหญิงกัญญา ใจดี" />
+              </div>
+
+              <div class="field">
+                <label>วัน / เดือน / ปีเกิด <small>(พ.ศ.)</small></label>
+                <input type="date" id="birthDate" />
+              </div>
+
+              <div class="field">
+                <label>อายุ <small>(คำนวณอัตโนมัติ)</small></label>
+                <input type="text" id="ageText" class="readonly" readonly placeholder="—" />
+                <div class="age-warn" id="ageWarn">⚠️ อายุอยู่นอกช่วงประเมิน (รองรับ 2.0 – 5.11 ปี)</div>
+              </div>
+
+              <div class="field">
+                <label>ห้องเรียน</label>
+                <input type="text" id="room" placeholder="เช่น อนุบาล 1/2" />
+              </div>
+
+              <div class="field">
+                <label>เพศ</label>
+                <div class="radio-row">
+                  <label><input type="radio" name="gender" value="ชาย" /> ชาย</label>
+                  <label><input type="radio" name="gender" value="หญิง" checked /> หญิง</label>
+                </div>
+              </div>
+
+              <div class="two-col">
+                <div class="field">
+                  <label>น้ำหนัก (กก.)</label>
+                  <input type="number" id="weight" step="0.1" placeholder="13.5" />
+                </div>
+                <div class="field">
+                  <label>ส่วนสูง (ซม.)</label>
+                  <input type="number" id="height" step="0.1" placeholder="95" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn btn-grad" id="btnToStep2" style="width:100%;padding:16px;font-size:16px;margin-top:8px;">
+            ถัดไป &nbsp;›
+          </button>
+        </div>
+
+        <!-- แถบช่วงอายุการประเมิน -->
+        <div class="age-band">
+          <h3>ช่วงอายุการประเมิน</h3>
+          <p>ระบบจะเลือกภารกิจที่เหมาะสมกับช่วงอายุโดยอัตโนมัติ</p>
+          <div class="age-cards" id="ageCards">
+            <div class="age-card" data-age="2"><div class="face">👦</div><b>2 ปี</b><small>2.0 - 2.11 ปี</small></div>
+            <div class="age-card" data-age="3"><div class="face">🧒</div><b>3 ปี</b><small>3.0 - 3.11 ปี</small></div>
+            <div class="age-card" data-age="4"><div class="face">👧</div><b>4 ปี</b><small>4.0 - 4.11 ปี</small></div>
+            <div class="age-card" data-age="5"><div class="face">👱</div><b>5 ปี</b><small>5.0 - 5.11 ปี</small></div>
+          </div>
+        </div>
+
+        <div class="page-foot">หน้า 1 : กรอกข้อมูลเด็ก</div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- STEP 2 : ทดสอบภารกิจ -->
+      <!-- ============================================ -->
+      <section class="screen" id="screenStep2">
+        <div class="card">
+          <div class="card-head"><span class="ic">🎯</span><h2>ทดสอบภารกิจ</h2></div>
+          <div class="card-sub">เชื่อมต่อข้อมูลจาก micro:bit หรือบันทึกคะแนนเอง</div>
+
+          <!-- สถานะ micro:bit -->
+          <div class="card mb-card" style="box-shadow:none;border:1.5px solid var(--line);margin-bottom:0;">
+            <div class="mb-status">
+              <div class="lab">สถานะการเชื่อมต่อ</div>
+              <div class="conn">✅ เชื่อมต่อแล้ว</div>
+              <div class="id">micro:bit ID : MB-00123</div>
+            </div>
+            <div class="mb-actions">
+              <button class="btn btn-grad" id="btnLinkMicrobit">🔗 ลิงก์ข้อมูลจาก micro:bit</button>
+              <button class="btn btn-ghost" id="btnManualScore">✏️ กรอกคะแนนเอง</button>
+            </div>
+          </div>
+
+          <div class="tbl-title" id="taskTitle">ภารกิจตามช่วงอายุ</div>
+          <table class="task-table">
+            <thead>
+              <tr>
+                <th>ภารกิจ</th><th>จำนวนข้อ</th><th>ทำถูก</th><th>คะแนนที่ได้</th><th>คะแนนเต็ม</th>
+              </tr>
+            </thead>
+            <tbody id="taskBody"></tbody>
+          </table>
+
+          <div class="task-total">
+            <span>คะแนนรวมภารกิจ</span>
+            <b id="taskTotal">0.0<small> / 70</small></b>
+          </div>
+
+          <div class="test-record">
+            <h4>บันทึกการทดสอบ</h4>
+            <div class="rrow"><span>วันที่และเวลา</span><b id="testDate">—</b></div>
+            <div class="rrow"><span>ครั้งที่</span><b id="testRound">1</b></div>
+          </div>
+
+          <div class="step-nav">
+            <button class="btn btn-ghost" id="btnBackStep1">‹ ย้อนกลับ</button>
+            <button class="btn btn-grad" id="btnToStep3">ดูผลสรุป ›</button>
+          </div>
+        </div>
+        <div class="page-foot">หน้า 2 : ลิงก์ข้อมูล / กรอกคะแนนภารกิจ</div>
+      </section>
+
+      <!-- ============================================ -->
+      <!-- STEP 3 : Dashboard สรุปผล  (ใช้ร่วมกับหน้ารวมผล) -->
+      <!-- ============================================ -->
+      <section class="screen" id="screenDashboard">
+        <div id="dashboardContent"></div>
+        <div class="page-foot">หน้า 3 : สรุปผลการประเมิน</div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- กล่อง Toast -->
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
