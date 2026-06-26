@@ -98,8 +98,13 @@
               </div>
 
               <div class="field">
-                <label>วัน / เดือน / ปีเกิด <small>(พ.ศ.)</small></label>
-                <input type="date" id="birthDate" />
+                <label>วัน / เดือน / ปีเกิด <small>(ค.ศ. หรือ พ.ศ.)</small></label>
+                <input type="text" id="birthDate"
+                  placeholder="เช่น 27/07/2023 หรือ 2023-07-27"
+                  inputmode="numeric" autocomplete="off" />
+                <small style="color:var(--ink-soft);font-size:11.5px;display:block;margin-top:5px;">
+                  พิมพ์รูปแบบ วว/ดด/ปปปป (ค.ศ.) เช่น 27/07/2023 หรือ พ.ศ. เช่น 27/07/2566
+                </small>
               </div>
 
               <div class="field">
