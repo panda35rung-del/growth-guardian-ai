@@ -456,3 +456,61 @@ img { display: block; }
   .profile-card { flex-direction: column; align-items: center; text-align: center; }
   .profile-info .prow { justify-content: center; }
 }
+
+/* ============================================================
+   เพิ่มเติม: ปุ่มลบใน Sidebar + Modal ยืนยันการลบ
+   ============================================================ */
+
+/* ปุ่มลบ 🗑️ ในแต่ละ student-item */
+.btn-del {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: transparent;
+  color: transparent;          /* ซ่อนไว้จนกว่า hover */
+  font-size: 15px; flex-shrink: 0;
+  display: grid; place-items: center;
+  transition: background .15s, color .15s;
+  border: none; cursor: pointer; padding: 0;
+  line-height: 1;
+}
+/* แสดงปุ่มลบเมื่อ hover หรือ active */
+.student-item:hover .btn-del  { color: #c4b8dc; }
+.student-item.active .btn-del { color: #c4b8dc; }
+.btn-del:hover { background: var(--danger-bg) !important; color: var(--danger) !important; }
+.btn-del:active { transform: scale(.9); }
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(40, 30, 70, .46);
+  display: grid; place-items: center;
+  z-index: 400;
+  animation: fadeIn .2s ease;
+  padding: 16px;
+}
+@keyframes fadeIn { from { opacity: 0; } }
+
+/* กล่อง Modal */
+.modal-box {
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  max-width: 360px; width: 100%;
+  box-shadow: 0 20px 60px rgba(60,40,120,.22);
+  text-align: center;
+  animation: rise .25s ease;
+}
+.modal-icon  { font-size: 46px; margin-bottom: 6px; }
+.modal-title { font-size: 20px; font-weight: 700; margin-bottom: 10px; color: var(--ink); }
+.modal-msg   { font-size: 14px; color: var(--ink-soft); line-height: 1.7; margin-bottom: 6px; }
+.modal-warn  { font-size: 12.5px; color: var(--danger); margin-bottom: 24px; font-weight: 500; }
+.modal-actions { display: flex; gap: 12px; }
+.modal-actions .btn { flex: 1; padding: 13px; font-size: 15px; border-radius: var(--radius-sm); }
+
+/* ปุ่ม "ลบ" สีแดง */
+.btn-danger {
+  background: var(--danger); color: #fff;
+  font-weight: 600; border: none;
+  border-radius: var(--radius-sm); cursor: pointer;
+}
+.btn-danger:hover  { filter: brightness(1.08); }
+.btn-danger:active { transform: scale(.97); }
