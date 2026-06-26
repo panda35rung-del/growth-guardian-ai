@@ -618,29 +618,95 @@ async function deleteStudent(docId, fullName) {
    ส่วนที่ 4 : หน้า 1 (ฟอร์มข้อมูลเด็ก)
    ============================================================ */
 
+// ---- ระบบกรอกวันเกิดอัตโนมัติ (พิมพ์แค่ตัวเลข ระบบเติม / เอง) ----
+
+// แปลงตัวเลข 8 หลัก → dd/mm/yyyy (ใส่ / ในตำแหน่งที่ถูกต้อง)
+function formatBirthDateDisplay(digits) {
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0,2)}/${digits.slice(2)}`;
+  return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+}
+
+// handler หลักของช่องวันเกิด:
+// - ดึงเฉพาะตัวเลข → format → set ค่า → คำนวณอายุเมื่อครบ 8 หลัก
+function handleBirthDateInput(e) {
+  const input   = e.target;
+  const oldVal  = input.value;
+  const oldCursor = input.selectionStart ?? oldVal.length;
+
+  // 1) ดึงแต่ตัวเลข จำกัด 8 หลัก
+  const digits    = oldVal.replace(/\D/g, '').slice(0, 8);
+  const formatted = formatBirthDateDisplay(digits);
+
+  // 2) อัปเดตค่าใน input (เฉพาะเมื่อเปลี่ยนจริง)
+  if (oldVal !== formatted) {
+    input.value = formatted;
+
+    // คำนวณ cursor ใหม่ให้ถูกต้องทั้งมือถือและ desktop:
+    // นับ digit ที่อยู่ก่อน cursor เดิม แล้วหาตำแหน่งใน formatted
+    const digBeforeCursor = oldVal.slice(0, oldCursor).replace(/\D/g, '').length;
+    let pos = formatted.length; // default = ท้าย
+    let cnt = 0;
+    for (let i = 0; i < formatted.length; i++) {
+      if (formatted[i] !== '/') cnt++;
+      if (cnt === digBeforeCursor) { pos = i + 1; break; }
+    }
+    if (digBeforeCursor === 0) pos = 0;
+    input.setSelectionRange(pos, pos);
+  }
+
+  // 3) UI ตอบสนองตามจำนวน digit
+  const ageEl  = document.getElementById("ageText");
+  const warnEl = document.getElementById("ageWarn");
+
+  if (digits.length === 0) {
+    // ช่องว่าง → ล้างทุกอย่าง
+    if (ageEl)  ageEl.value = "";
+    if (warnEl) warnEl.classList.remove("show");
+    highlightAgeCard(null);
+
+  } else if (digits.length < 8) {
+    // ยังพิมพ์ไม่ครบ → แสดง hint ไม่แสดง error
+    if (ageEl)  ageEl.value = `กรอกให้ครบ 8 หลัก (เหลืออีก ${8 - digits.length} หลัก)`;
+    if (warnEl) warnEl.classList.remove("show");
+    highlightAgeCard(null);
+
+  } else {
+    // ครบ 8 หลักแล้ว → คำนวณอายุทันที
+    onBirthDateChange();
+  }
+}
+
 // คำนวณอายุ + เลือกช่วงอายุ เมื่อกรอกหรือเปลี่ยนวันเกิด
 function onBirthDateChange() {
-  const val = document.getElementById("birthDate").value.trim();
-  const ageTextEl = document.getElementById("ageText");
-  const warn = document.getElementById("ageWarn");
+  const val    = document.getElementById("birthDate").value.trim();
+  const ageEl  = document.getElementById("ageText");
+  const warnEl = document.getElementById("ageWarn");
 
-  if (!val) { ageTextEl.value = ""; warn.classList.remove("show"); return; }
+  // ถ้าว่าง หรือ digit ยังไม่ครบ 8 หลัก → ไม่แสดง error ใด ๆ
+  const digits = val.replace(/\D/g, '');
+  if (!val || digits.length < 8) {
+    if (digits.length === 0 && ageEl)  ageEl.value = "";
+    if (warnEl) warnEl.classList.remove("show");
+    return;
+  }
 
+  // คำนวณอายุ
   const age = calculateAge(val);
   if (!age) {
-    ageTextEl.value = "รูปแบบวันที่ไม่ถูกต้อง";
-    warn.classList.remove("show");
+    if (ageEl)  ageEl.value = "วันที่ไม่ถูกต้อง กรุณาตรวจสอบ";
+    if (warnEl) warnEl.classList.remove("show");
     highlightAgeCard(null);
     return;
   }
 
-  ageTextEl.value = age.text;
+  if (ageEl) ageEl.value = age.text;
   const group = getAgeGroup(age);
   if (!group) {
-    warn.classList.add("show");
+    if (warnEl) warnEl.classList.add("show");
     highlightAgeCard(null);
   } else {
-    warn.classList.remove("show");
+    if (warnEl) warnEl.classList.remove("show");
     currentAgeGroup = group;
     highlightAgeCard(group);
   }
@@ -1262,11 +1328,10 @@ async function init() {
   else seedSampleData();                          // ใส่ตัวอย่างในเครื่อง
   await loadAllStudents();                        // โหลดรายชื่อเข้า Sidebar
 
-  // หน้า 1 — รับทั้ง change และ input เพื่อรองรับทุกรูปแบบการกรอก
+  // หน้า 1 — ช่องวันเกิด: ใช้ handleBirthDateInput (เติม / อัตโนมัติ)
   const bdEl = document.getElementById("birthDate");
-  bdEl.addEventListener("change", onBirthDateChange);
-  bdEl.addEventListener("input",  onBirthDateChange);
-  bdEl.addEventListener("blur",   onBirthDateChange); // จับตอนออกจากช่อง
+  bdEl.addEventListener("input", handleBirthDateInput);  // ทุกครั้งที่พิมพ์/ลบ
+  bdEl.addEventListener("blur",  onBirthDateChange);     // ตรวจสอบเมื่อออกจากช่อง
 
   // ตรวจสอบว่าปุ่มมีอยู่จริงก่อนผูก event
   const btnStep2 = document.getElementById("btnToStep2");
