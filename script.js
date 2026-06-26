@@ -405,33 +405,45 @@ async function loadAllStudents() {
 // alias ตามสเปค
 const renderStudentList = () => renderSidebarStudents(students);
 
-// วาดรายชื่อใน Sidebar
+// วาดรายชื่อใน Sidebar (แต่ละ item มีปุ่ม 🗑️ ลบ)
 function renderSidebarStudents(list) {
   const box = document.getElementById("studentList");
   box.innerHTML = `<div class="list-title">รายชื่อนักเรียน (${list.length})</div>`;
 
   if (!list.length) {
     box.innerHTML += `<div style="padding:24px 12px;text-align:center;color:#9a96b0;font-size:13px;">
-      ยังไม่มีรายชื่อนักเรียน<br>กด “+ เพิ่มนักเรียนใหม่”</div>`;
+      ยังไม่มีรายชื่อนักเรียน<br>กด "+ เพิ่มนักเรียนใหม่"</div>`;
     return;
   }
 
   list.forEach(s => {
     const b = badgeClass(s.latestRiskLevel);
     const item = document.createElement("div");
-    item.className = "student-item" + (currentStudent && currentStudent.docId === s.docId ? " active" : "");
+    item.className = "student-item" +
+      (currentStudent && currentStudent.docId === s.docId ? " active" : "");
+
     item.innerHTML = `
       ${avatarHTML(s)}
       <div class="student-meta">
         <b>${s.fullName || "-"}</b>
         <small>${s.room || "-"} · ${s.ageText || ""}</small>
       </div>
-      <span class="badge ${b.cls}">${b.text}</span>`;
+      <span class="badge ${b.cls}">${b.text}</span>
+      <button class="btn-del" title="ลบนักเรียน">🗑️</button>`;
+
+    // คลิก item → เปิดหน้าประวัติ
     item.onclick = () => selectStudentFromSidebar(s.docId);
+
+    // คลิกปุ่มลบ → หยุด bubble + เปิด modal ยืนยัน
+    const delBtn = item.querySelector(".btn-del");
+    delBtn.onclick = (e) => {
+      e.stopPropagation(); // ป้องกัน item.onclick ทำงาน
+      showDeleteConfirm(s);
+    };
+
     box.appendChild(item);
   });
 }
-
 // รูปวงกลม หรือ ตัวอักษรย่อ
 function avatarHTML(s) {
   if (s.photoURL) return `<img class="student-avatar" src="${s.photoURL}" alt="">`;
@@ -505,6 +517,101 @@ async function renderStudentOverview(student) {
 async function refreshCloudStudents() {
   await loadAllStudents();
   toast(DB.mode === "cloud" ? "รีเฟรชข้อมูล Cloud สำเร็จ" : "รีเฟรชข้อมูลในเครื่องแล้ว", "ok");
+}
+
+/* ============================================================
+   ระบบลบนักเรียน: Modal ยืนยัน + ลบจาก Firestore/localStorage
+   ============================================================ */
+
+// แสดง Modal ยืนยันการลบ (ไม่ใช้ window.confirm เพราะบล็อกใน iframe/มือถือ)
+function showDeleteConfirm(student) {
+  // ลบ modal เก่าถ้ามี
+  const existing = document.getElementById("deleteModal");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "deleteModal";
+  overlay.className = "modal-overlay";
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-icon">🗑️</div>
+      <h3 class="modal-title">ลบข้อมูลนักเรียน</h3>
+      <p class="modal-msg">
+        ต้องการลบข้อมูล <b>${student.fullName || "นักเรียน"}</b><br>
+        และประวัติการประเมินทั้งหมดหรือไม่?
+      </p>
+      <p class="modal-warn">⚠️ การลบนี้ไม่สามารถย้อนกลับได้</p>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btnCancelDel">ยกเลิก</button>
+        <button class="btn btn-danger" id="btnConfirmDel">🗑️ ลบ</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  // ปิด modal: กด "ยกเลิก" หรือคลิกพื้นหลัง
+  const closeModal = () => overlay.remove();
+  document.getElementById("btnCancelDel").onclick = closeModal;
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+
+  // ยืนยันลบ
+  document.getElementById("btnConfirmDel").onclick = async () => {
+    closeModal();
+    await deleteStudent(student.docId, student.fullName);
+  };
+}
+
+// ลบนักเรียน 1 คน พร้อมประวัติทั้งหมดจาก Firestore หรือ localStorage
+async function deleteStudent(docId, fullName) {
+  console.log("🗑️ [deleteStudent] เริ่มลบ docId:", docId);
+
+  try {
+    if (DB.mode === "cloud") {
+      const { doc, deleteDoc, collection, getDocs, query, where } = DB.fx;
+
+      // 1) ดึงประวัติทั้งหมดที่มี studentId ตรงกัน แล้วลบทีละ doc
+      const histQ = query(
+        collection(DB.db, COL_HISTORY),
+        where("studentId", "==", docId)
+      );
+      const histSnap = await getDocs(histQ);
+      await Promise.all(
+        histSnap.docs.map(d => deleteDoc(doc(DB.db, COL_HISTORY, d.id)))
+      );
+      console.log(`✅ ลบ history ${histSnap.docs.length} รายการ`);
+
+      // 2) ลบ document ของนักเรียนใน collection students
+      await deleteDoc(doc(DB.db, COL_STUDENTS, docId));
+      console.log("✅ ลบนักเรียนจาก students สำเร็จ");
+
+      // onSnapshot จะอัปเดต students[] และ Sidebar อัตโนมัติ
+
+    } else {
+      // โหมด localStorage
+      const stuArr = lsGet("gg_students").filter(s => s.docId !== docId);
+      lsSet("gg_students", stuArr);
+
+      const histArr = lsGet("gg_history").filter(h => h.studentId !== docId);
+      lsSet("gg_history", histArr);
+
+      students = stuArr; // อัปเดต cache
+      renderSidebarStudents(students);
+      console.log("✅ ลบจาก localStorage สำเร็จ");
+    }
+
+    // ถ้านักเรียนที่ถูกลบคือคนที่กำลังเปิดอยู่ → ยกเลิก listener แล้วกลับหน้าแรก
+    if (currentStudent && currentStudent.docId === docId) {
+      if (unsubHistory) { unsubHistory(); unsubHistory = null; }
+      currentStudent = null;
+      newStudent(); // กลับหน้ากรอกข้อมูล (เพิ่มนักเรียนใหม่)
+    }
+
+    toast(`ลบข้อมูล "${fullName || "นักเรียน"}" สำเร็จ ✅`, "ok");
+
+  } catch (err) {
+    console.error("❌ [deleteStudent] error:", err);
+    toast("เกิดข้อผิดพลาดในการลบ: " + (err?.message || String(err)), "warn");
+  }
 }
 
 /* ============================================================
